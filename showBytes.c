@@ -21,17 +21,17 @@ void show_bytes(const byte_pointer bytePtr, const size_t length) {
     printf("\n");
 }
 //calls show_bytes using an int
-void show_int(int x) {
+void show_int(const int x) {
     printf("Int bytes as hex 0x: ");
     show_bytes((byte_pointer) &x, sizeof(int));
 }
-//calls show_bytes using an float
-void show_float(float x) {
+//calls show_bytes using a float
+void show_float(const float x) {
     printf("Float bytes as hex 0x: ");
     show_bytes((byte_pointer) &x, sizeof(float));
 }
-//calls show_byte for a unspecified pointer
-void show_pointer(void* x) {
+//calls show_byte for an unspecified pointer
+void show_pointer(const void* x) {
     printf("Pointer bytes as hex 0x: ");
     show_bytes((byte_pointer) &x, sizeof(void*));
 }
