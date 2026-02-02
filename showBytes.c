@@ -12,11 +12,7 @@ typedef unsigned char* byte_pointer;
 values for each byte.*/
 void show_bytes(const byte_pointer bytePtr, const size_t length) {
     for(size_t i = 0; i < length; i++) {
-        printf("%X",bytePtr[i]);
-        if(bytePtr[i] == 0) {
-            printf("0");
-        }
-        printf(" ");
+        printf("%.2X ",bytePtr[i]);
     }
     printf("\n");
 }
