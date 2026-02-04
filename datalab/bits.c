@@ -1,6 +1,6 @@
 /* 
  * CS:APP Data Lab 
- * 
+ * blahblahblah
  * <Haley Gray 102061485>
  * 
  * bits.c - Source file with your solutions to the Lab.
