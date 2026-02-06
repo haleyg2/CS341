@@ -172,8 +172,23 @@ NOTES:
  *   Rating: 2
  */
 int allEvenBits(int x) {
+  //0x55 55 55 55
+  //when all nibles 0x5 -> all even positions are 1
+  int temp = 0x55;
+  //extend 0x55 to all bytes
+  temp = (temp | (temp << 8));
+  temp = (temp | (temp << 8));
+  temp = (temp | (temp << 8));
 
-  return 2;
+  //& temp with input
+  //even 1bits that match the mask goto the copy
+  //don't care about odd bits
+  int evenPosCopy = temp & x;
+  //if copy doesn't completely match, some 1s are left over
+  int result =  temp ^ evenPosCopy;
+  //flip to 1 if they completely match / 0 if not
+  result = !result;
+  return result;
 }
 /*
  * bitParity - returns 1 if x contains an odd number of 0's
@@ -181,9 +196,39 @@ int allEvenBits(int x) {
  *   Legal ops: ! ~ & ^ | + << >>
  *   Max ops: 20
  *   Rating: 4
+ * Refrences: https://youtu.be/c8qAti1zBVQ?si=MB8cc-3m5iyg43z_
+ *  video link helped me create a truth table for parity
+ *  I made a truth table with 4 bits to start.
+ *  Rows where there's an odd # of 0s simplifies to A^B^C^D
+ * 
+ * https://www.geeksforgeeks.org/dsa/compute-parity-number-using-xor-table-look/
+ * Helped me come up with a solution to xor each bit
+ * If you shift half of an Int to the right and XOR to
+ * itself continously shifting half the amount of the last shift
+ * until you only shifted 1bit; Still XOR after each shift;
+ * 
+ * Then the last bit will be the result of all bits XOR'd
  */
 int bitParity(int x) {
-  return 2;
+  //EX of 4bit a xor b xor c xor d
+  // a b c d                       a b c d
+  // 0 0 a b ^                     a a a b ^
+  // a b a^c b^d                a^a a^b a^C b^d
+  // 0 a  b a^c  ^               a^a a^a a^b a^c  ^
+  // a a^b (a^c)^b (a^c)^(b^d)  ==       (a^c)^(b^d) 
+  //DOESN't MATTER IF LOGIC or ARITH. RIGHT SHIFT
+  // Last bit == a xor b xor c xor d
+  // -> if last bit == 1, -> odd #of 0s.
+  //assuming 32bit sized Int
+  int temp = x ^ (x >> 16);
+  temp = temp ^ (temp >> 8);
+  temp = temp ^ (temp >> 4);
+  temp = temp ^ (temp >> 2);
+  temp = temp ^ (temp >> 1);
+  
+  //if LSB == 1, odd 0s -- Cut off last bit
+  temp = temp & 1;
+  return temp;
 }
 /* 
  * bitXor - x^y using only ~ and & 
@@ -225,7 +270,12 @@ int replaceByte(int x, int n, int c) {
  *   Rating: 1
  */
 int tmax(void) {
-  return 2;
+  //Two's complement Ints lose a bit for the sign
+  int max = 0xFF; 
+  max = (max << 8) | max; //first 16bits 1
+  max = (max << 15) | max; //first 31 bits are 1
+
+  return max;
 }
 /* 
  * fitsBits - return 1 if x can be represented as an 
@@ -237,6 +287,9 @@ int tmax(void) {
  *   Rating: 2
  */
 int fitsBits(int x, int n) {
+
+
+
   return 2;
 }
 /* 
@@ -268,7 +321,18 @@ int isEqual(int x, int y) {
  *   Rating: 3
  */
 int isPositive(int x) {
-  return 2;
+  // return 0 if  x <= 0, 1 if x > 0
+  // return 0 if x is either negative or 0
+  // return 1 if x is positive
+
+  //sign bit will be 1 if negative number
+  int signBit = (x >> 31) & 1;
+  //!x will be 1 if x is 0
+  int isZero = !x;
+
+  //return 1 if not (neg or zero) -> not(neg) and not(zero)
+  int result = !(signBit | isZero);
+  return result;
 }
 /* 
  * subOK - Determine if can compute x-y without overflow
@@ -283,7 +347,7 @@ int subOK(int x, int y) {
 }
 /* howManyBits - return the minimum number of bits required to represent x in
  *             two's complement
- *  Examples: howManyBits(12) = 5
+ *  Examples: howManyBits(12) = 5 
  *            howManyBits(298) = 10
  *            howManyBits(-5) = 4
  *            howManyBits(0)  = 1
