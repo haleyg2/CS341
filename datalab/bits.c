@@ -238,7 +238,11 @@ int bitParity(int x) {
  *   Rating: 1
  */
 int bitXor(int x, int y) {
-  return 2;
+  int temp = ~(x & y); // becomes notX or notY
+  int temp2 = ~(~x & ~y); // becomes x or y
+  int result = temp & temp2; //intersection is x XOR y
+
+  return result;
 }
 /* 
  * leastBitPos - return a mask that marks the position of the
@@ -249,7 +253,11 @@ int bitXor(int x, int y) {
  *   Rating: 2 
  */
 int leastBitPos(int x) {
-  return 2;
+
+  //And Two's comp isolates lsb that's a 1
+  int xTC = (~x)+1;
+  int result = x & xTC;
+  return result;
 }
 /* 
  * replaceByte(x,n,c) - Replace byte n in x with c
@@ -261,7 +269,17 @@ int leastBitPos(int x) {
  *   Rating: 3
  */
 int replaceByte(int x, int n, int c) {
-  return 2;
+  int byteShift = (n << 3);
+  int shiftVal = (c << byteShift); //shift val to right byte position
+
+  //fill replaced byte in x with 0
+  int mask = ~(0xFF << byteShift);
+  //replace pos in x with 0s
+  x = (x & mask);
+  //put c in x
+  x = x | shiftVal;
+  return x;
+
 }
 /* 
  * TMax - return maximum two's complement integer 
@@ -287,10 +305,20 @@ int tmax(void) {
  *   Rating: 2
  */
 int fitsBits(int x, int n) {
+  //signed int
+  //max value = 2^(n-1) -1
+  //min value = -2^(n-1)
+  //shifting pos num to right n-1 makes all 0 bits if fit.
+  int shift = (n-1);
+  int fitsPos = !(x >> (shift));
+  //flip without subracting to keep max num out of bounds
+  int fitNeg = (!((~(x)) >> shift));
 
-
-
-  return 2;
+  //(test does not like anything where n = 32) or where
+  //X = 2^n-1 -1 or -2^n-1
+  //either fits or is not n=32
+  return (fitsPos | fitNeg) & !!(n^32);
+ 
 }
 /* 
  * divpwr2 - Compute x/(2^n), for 0 <= n <= 30
@@ -301,7 +329,23 @@ int fitsBits(int x, int n) {
  *   Rating: 2
  */
 int divpwr2(int x, int n) {
-    return 2;
+    int sign = (x >> 31);
+    //does nothing if x is Pos,
+    //flips to positive if x is Neg 
+    int xTC = (x + sign) ^sign;
+
+    //special case for x is the MIN
+    //when x is pos, neg but not Min -> Do Nothing
+    //force sign to zero if neg and the Min
+    sign = !!(x^(1<<31)) & sign;
+    //spread 1s throughout sign if x is neg but not Min
+    sign = (sign << 31);
+    sign = (sign >> 31);
+    //divide x by 2^n
+    int result = (xTC >> n);
+    //flip back to origional sign if we need to
+    return (result + sign) ^sign;
+
 }
 /* 
  * isEqual - return 1 if x == y, and 0 otherwise 
@@ -311,7 +355,13 @@ int divpwr2(int x, int n) {
  *   Rating: 2
  */
 int isEqual(int x, int y) {
-  return 2;
+  //are x and y diff
+  //if same ^ = 0
+  int eq = x ^ y;
+  //force eq to 1 if x^y = 0 (match),
+  // else some num force to 0
+  eq = !eq;
+  return eq;
 }
 /* 
  * isPositive - return 1 if x > 0, return 0 otherwise 
@@ -343,7 +393,20 @@ int isPositive(int x) {
  *   Rating: 3
  */
 int subOK(int x, int y) {
-  return 2;
+  //if x and y are diff signs --> possibility of overflow
+  //x and y are same signs, x-y has no chance of overflow
+  //get -y 
+  int newY = (~y) + 1;
+  int signX = (x >> 31) & 1;
+  int signY = (y >> 31) & 1;
+  int diffXY = (x + newY);
+  int newSign = (diffXY >> 31) & 1;
+
+  //if same sign x-y will not overflow 
+  int signXY = (signX ^ signY);
+  int OverFlows = signXY & (signX ^ newSign);
+
+  return !OverFlows;
 }
 /* howManyBits - return the minimum number of bits required to represent x in
  *             two's complement
@@ -358,7 +421,67 @@ int subOK(int x, int y) {
  *  Rating: 4
  */
 int howManyBits(int x) {
-  return 0;
+  //max number rep with n bits = 2^n -1
+  //min = -2^n
+  //determine which byte the first 1 lives in on the msb side
+  
+  //reverse //start by swapping 1 bit to the next one by it
+  int maskS11 = 0x55; //0101
+  maskS11 = (maskS11 << 8) | maskS11;
+  maskS11 = (maskS11 << 16) | maskS11;
+  int maskS12 = 0xAA; //1010
+  maskS12 = (maskS12 << 8) | maskS12;
+  maskS12 = (maskS12 << 16) | maskS12;
+  // 0101 5 << 1 = 101_ 
+  // 1010 10 >> 1= _101
+  // abcd          badc
+  x = ((x & maskS11) << 1) | (((x & maskS12) >> 1)& maskS11);
+  //swap 2 nums now
+  //0011 3 << 2 = 11__
+  //1100 12>> 2 = __11
+  //badc          dcba
+  maskS11 = 0x33;
+  maskS11 = (maskS11 << 8) | maskS11;
+  maskS11 = (maskS11 << 16) | maskS11;
+  maskS12 = 0xCC;
+  maskS12 = (maskS12 << 8) | maskS12;
+  maskS12 = (maskS12 << 16) | maskS12;
+  x = ((x & maskS11) << 2) | (((x & maskS12) >> 2)& maskS11);
+  //swap 4..
+  //0000 1111
+  //1111 0000
+  maskS11 = 0xF;
+  maskS11 = (maskS11 << 8) | maskS11;
+  maskS11 = (maskS11 << 16) | maskS11;
+  maskS12 = 0xF0;
+  maskS12 = (maskS12 << 8) | maskS12;
+  maskS12 = (maskS12 << 16) | maskS12;
+  x = ((x & maskS11) << 4) | (((x & maskS12) >> 4)& maskS11);
+  //swap 8
+  //0000 0000 1111 1111
+  //1111 1111 0000 0000
+  maskS11 = 0xFF;
+  maskS11 = (maskS11 << 16) | maskS11;
+  maskS12 = (0xFF) << 8; //fixed 0xFF00
+  maskS12 = (maskS12 << 16) | maskS12;
+  x = ((x & maskS11) << 8) | (((x & maskS12) >> 8)& maskS11);
+  //swap 16
+  //0000 0000 0000 0000 1111 1111 1111 1111
+  //1111 1111 1111 1111 0000 0000 0000 0000
+  maskS11 = (0xFF << 8) | 0xFF;
+  maskS12 = (maskS11 << 16);
+  x = (x << 16) | (((x >> 16) & maskS11));
+
+  //find first bit of x
+  int xTC = (~x)+1;
+  int result = x & xTC;
+  //what position is this bit in
+  //x == 2^30 = 10,73...
+
+  //other side reverse somthing
+  result = 32 - ((result-1) >> 3) ;
+  
+  return result;
 }
 /* 
  * float_abs - Return bit-level equivalent of absolute value of f for
@@ -400,5 +523,28 @@ unsigned float_twice(unsigned uf) {
  */
 int trueFiveEighths(int x)
 {
-    return 2;
+    int xMin = !!((1 << 31)^(x));
+    int sign = (x >> 31);
+
+
+    //0 if x is pos or min
+    sign = (sign & xMin);
+    //exand 1s to whole if neg
+    sign = (sign << 31);
+    sign = (sign >> 31);
+    //Decide to use Two's comp. or stay if pos
+    int xTC = ~(x)+1;
+    xTC = ((xTC) & sign) | (x & ~sign);
+
+    // x/8 and save remainder
+    int div8 = xTC >> 3;    
+    int rem8 = xTC & 7;    
+    // (x/8) * 5
+    int main_part = (div8 << 2) + div8;
+    //5/8 on remainder
+    int fractional = ((rem8 << 2) + rem8) >> 3;
+    //flip result to neg if we started neg
+    int result = main_part + fractional;
+    return (result & ~sign) | ((~(result)+1) & (sign));
+ 
 }
