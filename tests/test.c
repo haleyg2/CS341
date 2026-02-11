@@ -2,13 +2,10 @@
 
 
 int main() {
-  int x = -3;
+  int x = -4;
 
-  int s = (x >> 31);
-
-  int absVX = (x-1) ^( s);
-
-  printf("%d" ,absVX);
+  int x2 = (~x) + 1;
+  printf("%x" ,x &(x-1));
 
     return 0;
 }

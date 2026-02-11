@@ -419,69 +419,56 @@ int subOK(int x, int y) {
  *  Legal ops: ! ~ & ^ | + << >>
  *  Max ops: 90
  *  Rating: 4
+ * 
+ *  refrences: https://graphics.stanford.edu/~seander/bithacks.html#ParityWith64Bits
  */
+
+
 int howManyBits(int x) {
   //max number rep with n bits = 2^n -1
   //min = -2^n
-  //determine which byte the first 1 lives in on the msb side
   
-  //reverse //start by swapping 1 bit to the next one by it
-  int maskS11 = 0x55; //0101
-  maskS11 = (maskS11 << 8) | maskS11;
-  maskS11 = (maskS11 << 16) | maskS11;
-  int maskS12 = 0xAA; //1010
-  maskS12 = (maskS12 << 8) | maskS12;
-  maskS12 = (maskS12 << 16) | maskS12;
-  // 0101 5 << 1 = 101_ 
-  // 1010 10 >> 1= _101
-  // abcd          badc
-  x = ((x & maskS11) << 1) | (((x & maskS12) >> 1)& maskS11);
-  //swap 2 nums now
-  //0011 3 << 2 = 11__
-  //1100 12>> 2 = __11
-  //badc          dcba
-  maskS11 = 0x33;
-  maskS11 = (maskS11 << 8) | maskS11;
-  maskS11 = (maskS11 << 16) | maskS11;
-  maskS12 = 0xCC;
-  maskS12 = (maskS12 << 8) | maskS12;
-  maskS12 = (maskS12 << 16) | maskS12;
-  x = ((x & maskS11) << 2) | (((x & maskS12) >> 2)& maskS11);
-  //swap 4..
-  //0000 1111
-  //1111 0000
-  maskS11 = 0xF;
-  maskS11 = (maskS11 << 8) | maskS11;
-  maskS11 = (maskS11 << 16) | maskS11;
-  maskS12 = 0xF0;
-  maskS12 = (maskS12 << 8) | maskS12;
-  maskS12 = (maskS12 << 16) | maskS12;
-  x = ((x & maskS11) << 4) | (((x & maskS12) >> 4)& maskS11);
-  //swap 8
-  //0000 0000 1111 1111
-  //1111 1111 0000 0000
-  maskS11 = 0xFF;
-  maskS11 = (maskS11 << 16) | maskS11;
-  maskS12 = (0xFF) << 8; //fixed 0xFF00
-  maskS12 = (maskS12 << 16) | maskS12;
-  x = ((x & maskS11) << 8) | (((x & maskS12) >> 8)& maskS11);
-  //swap 16
-  //0000 0000 0000 0000 1111 1111 1111 1111
-  //1111 1111 1111 1111 0000 0000 0000 0000
-  maskS11 = (0xFF << 8) | 0xFF;
-  maskS12 = (maskS11 << 16);
-  x = (x << 16) | (((x >> 16) & maskS11));
+  //convert to positive or stay at max or stay positive
+  int sign = (x >> 31);
+  x = (x + sign) ^ sign;
+  int saveX = x; //reuse this og x when determining if x is a pow of 2
+  //fill all to the right of the msb 1bit with 1s
+  x = (x >> 1) | x;
+  x = (x >> 2) | x;
+  x = (x >> 4) | x;
+  x = (x >> 8) | x;
+  x = (x >> 16) | x;
+  //...5555
+  int fiveMask = 0x55;
+  fiveMask = (fiveMask << 8) | fiveMask;
+  fiveMask = (fiveMask << 16) | fiveMask;
+  //...3333
+  int threeMask = 0x33;
+  threeMask = (threeMask << 8) | threeMask;
+  threeMask = (threeMask << 16) | threeMask;
+  //...0F0F
+  int altNibMask = 0xF;
+  altNibMask = (altNibMask << 8) | altNibMask;
+  altNibMask = (altNibMask << 16) | altNibMask;
 
-  //find first bit of x
-  int xTC = (~x)+1;
-  int result = x & xTC;
-  //what position is this bit in
-  //x == 2^30 = 10,73...
+  int temp = ((x >> 1) & fiveMask);
+  x = x + ((~temp)+1) ;
+  x = (x & threeMask) + ((x >> 2) & threeMask);
+  int result = (x + (x >> 4) & altNibMask);
+  //result * 0x1010101 = 16,843,009
+  // result = result * 2^24 + result * 2^16 + result * 2^8 + result
+  // 2*5 = (2 << 2) + 2 = 2*4 + 2
+  result = (result << 24) + (result << 16) + (result << 8) + result;
+  result = (result >> 24)+1;
 
-  //other side reverse somthing
-  result = 32 - ((result-1) >> 3) ;
+  //x & (x-1) will be 0 if x is just 2^n
+  int subOne = (sign & (!!!(saveX & (saveX + ~0))));
+  //be neg 1 if subOne = -1
+  subOne = (~subOne) + 1;
+  //subOne if x is most neg value
+  int min = (1 << 31);
+  return result + subOne; //+ subOne;//+ (sign & (~1 + !!(x ^ min)+1));
   
-  return result;
 }
 /* 
  * float_abs - Return bit-level equivalent of absolute value of f for
@@ -495,7 +482,12 @@ int howManyBits(int x) {
  *   Rating: 2
  */
 unsigned float_abs(unsigned uf) {
-  return 2;
+  //if NAN exponent is 255 and mantissa is not 0
+
+
+  //0 if exponent is 0 and mantissa is 0 
+
+  return uf;
 }
 /* 
  * float_twice - Return bit-level equivalent of expression 2*f for
