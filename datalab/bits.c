@@ -175,6 +175,8 @@ int allEvenBits(int x) {
   //0x55 55 55 55
   //when all nibles 0x5 -> all even positions are 1
   int temp = 0x55;
+  int evenPosCopy = 0;
+  int result = 0;
   //extend 0x55 to all bytes
   temp = (temp | (temp << 8));
   temp = (temp | (temp << 8));
@@ -183,9 +185,9 @@ int allEvenBits(int x) {
   //& temp with input
   //even 1bits that match the mask goto the copy
   //don't care about odd bits
-  int evenPosCopy = temp & x;
+  evenPosCopy = temp & x;
   //if copy doesn't completely match, some 1s are left over
-  int result =  temp ^ evenPosCopy;
+  result =  temp ^ evenPosCopy;
   //flip to 1 if they completely match / 0 if not
   result = !result;
   return result;
@@ -309,7 +311,7 @@ int fitsBits(int x, int n) {
   //max value = 2^(n-1) -1
   //min value = -2^(n-1)
   //shifting pos num to right n-1 makes all 0 bits if fit.
-  int shift = (n-1);
+  int shift = (n + ~0);
   int fitsPos = !(x >> (shift));
   //flip without subracting to keep max num out of bounds
   int fitNeg = (!((~(x)) >> shift));
@@ -330,6 +332,7 @@ int fitsBits(int x, int n) {
  */
 int divpwr2(int x, int n) {
     int sign = (x >> 31);
+    int result = 0;
     //does nothing if x is Pos,
     //flips to positive if x is Neg 
     int xTC = (x + sign) ^sign;
@@ -342,7 +345,7 @@ int divpwr2(int x, int n) {
     sign = (sign << 31);
     sign = (sign >> 31);
     //divide x by 2^n
-    int result = (xTC >> n);
+    result = (xTC >> n);
     //flip back to origional sign if we need to
     return (result + sign) ^sign;
 
@@ -430,8 +433,16 @@ int howManyBits(int x) {
   
   //convert to positive or stay at max or stay positive
   int sign = (x >> 31);
+  int saveX = 0;
+  int fiveMask = 0x55;
+  int threeMask = 0x33;
+  int altNibMask = 0xF;
+  int temp = 0;
+  int result = 0;
+  int subOne = 0;
+
   x = (x + sign) ^ sign;
-  int saveX = x; //reuse this og x when determining if x is a pow of 2
+  saveX = x; //reuse this og x when determining if x is a pow of 2
   //fill all to the right of the msb 1bit with 1s
   x = (x >> 1) | x;
   x = (x >> 2) | x;
@@ -439,22 +450,22 @@ int howManyBits(int x) {
   x = (x >> 8) | x;
   x = (x >> 16) | x;
   //...5555
-  int fiveMask = 0x55;
+  
   fiveMask = (fiveMask << 8) | fiveMask;
   fiveMask = (fiveMask << 16) | fiveMask;
   //...3333
-  int threeMask = 0x33;
+  
   threeMask = (threeMask << 8) | threeMask;
   threeMask = (threeMask << 16) | threeMask;
   //...0F0F
-  int altNibMask = 0xF;
+  
   altNibMask = (altNibMask << 8) | altNibMask;
   altNibMask = (altNibMask << 16) | altNibMask;
 
-  int temp = ((x >> 1) & fiveMask);
+  temp = ((x >> 1) & fiveMask);
   x = x + ((~temp)+1) ;
   x = (x & threeMask) + ((x >> 2) & threeMask);
-  int result = (x + (x >> 4) & altNibMask);
+  result = (x + (x >> 4) & altNibMask);
   //result * 0x1010101 = 16,843,009
   // result = result * 2^24 + result * 2^16 + result * 2^8 + result
   // 2*5 = (2 << 2) + 2 = 2*4 + 2
@@ -462,11 +473,10 @@ int howManyBits(int x) {
   result = (result >> 24)+1;
 
   //x & (x-1) will be 0 if x is just 2^n
-  int subOne = (sign & (!!!(saveX & (saveX + ~0))));
+  subOne = (sign & (!!!(saveX & (saveX + ~0))));
   //be neg 1 if subOne = -1
   subOne = (~subOne) + 1;
   //subOne if x is most neg value
-  int min = (1 << 31);
   return result + subOne; //+ subOne;//+ (sign & (~1 + !!(x ^ min)+1));
   
 }
@@ -517,6 +527,12 @@ int trueFiveEighths(int x)
 {
     int xMin = !!((1 << 31)^(x));
     int sign = (x >> 31);
+    int xTC = 0;
+    int div8 = 0;
+    int rem8 = 0;
+    int main_part = 0;
+    int fractional = 0;
+    int result = 0;
 
 
     //0 if x is pos or min
@@ -525,18 +541,16 @@ int trueFiveEighths(int x)
     sign = (sign << 31);
     sign = (sign >> 31);
     //Decide to use Two's comp. or stay if pos
-    int xTC = ~(x)+1;
-    xTC = ((xTC) & sign) | (x & ~sign);
-
+    xTC = (x + sign) ^ sign;
     // x/8 and save remainder
-    int div8 = xTC >> 3;    
-    int rem8 = xTC & 7;    
+    div8 = xTC >> 3;    
+    rem8 = xTC & 7;    
     // (x/8) * 5
-    int main_part = (div8 << 2) + div8;
+    main_part = (div8 << 2) + div8;
     //5/8 on remainder
-    int fractional = ((rem8 << 2) + rem8) >> 3;
+    fractional = ((rem8 << 2) + rem8) >> 3;
     //flip result to neg if we started neg
-    int result = main_part + fractional;
+    result = main_part + fractional;
     return (result & ~sign) | ((~(result)+1) & (sign));
  
 }
