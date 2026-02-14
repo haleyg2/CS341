@@ -423,62 +423,49 @@ int subOK(int x, int y) {
  *  Max ops: 90
  *  Rating: 4
  * 
- *  refrences: https://graphics.stanford.edu/~seander/bithacks.html#ParityWith64Bits
+ *  refrences: https://www.solutioninn.com/study-help/questions/please-explain-this-bitwise-operation-line-by-line-thank-you-13825030
+ *
+ * The general process is like this;
+ * x is shifted 16 to the right, if there are still 1s,
+ * that means we need at least 16 bits for the num, so we add
+ * (1 << 4) === adding 16
+ * shifting is used instead of just adding here since if there
+ * were no 1s, we don't want to add anything for the bit requirement
+ * 
+ * Then x is shifted (16) + 8 bits to the right. If there are STILL
+ * ones remaining, we need at least 24 bits for our number.
+ * and so on....
+ * 
+ * For example if we had (25) = 0001 1001
+ * 25 >> 16 -> only 0s so n <= 16
+ * 25 >> (0)+8 -> only 0s -> n <= 8
+ * 25 >> (0)+4 -> 1 -> 4 < n <= 8
+ * 25 >> (4)+2 -> 0s -> 4 < n <= 6
+ * 25 >> (4)+1 -> 0s -> 4 < n <= 5
+ * 25 >> (4) -> 1 -> n = 5
+ * add one at the end to accommodate it being signed
+ * n = 6
+ * 
+ * 
  */
-
-
 int howManyBits(int x) {
-  //max number rep with n bits = 2^n -1
-  //min = -2^n
-  
-  //convert to positive or stay at max or stay positive
   int sign = (x >> 31);
-  int saveX = 0;
-  int fiveMask = 0x55;
-  int threeMask = 0x33;
-  int altNibMask = 0xF;
-  int temp = 0;
-  int result = 0;
-  int subOne = 0;
+  int n = 0; //# of required bits
+  //flip if neg/do nothing if positive
+  //don't sub 1 to keep max in range
+  x = x ^ sign;
 
-  x = (x + sign) ^ sign;
-  saveX = x; //reuse this og x when determining if x is a pow of 2
-  //fill all to the right of the msb 1bit with 1s
-  x = (x >> 1) | x;
-  x = (x >> 2) | x;
-  x = (x >> 4) | x;
-  x = (x >> 8) | x;
-  x = (x >> 16) | x;
-  //...5555
-  
-  fiveMask = (fiveMask << 8) | fiveMask;
-  fiveMask = (fiveMask << 16) | fiveMask;
-  //...3333
-  
-  threeMask = (threeMask << 8) | threeMask;
-  threeMask = (threeMask << 16) | threeMask;
-  //...0F0F
-  
-  altNibMask = (altNibMask << 8) | altNibMask;
-  altNibMask = (altNibMask << 16) | altNibMask;
+  //if x >> n+number of bits and is 0,
+  //it implies we need at least n+number bits for the number x
+  n = n + ((!!(x >> (n+16))) << 4);
+  n = n + ((!!(x >> (n+8))) << 3);
+  n = n + ((!!(x >> (n+4))) << 2);
+  n = n + ((!!(x >> (n+2))) << 1);
+  n = n + ((!!(x >> (n+1))));
+  n = n + ((!!(x >> (n))));
 
-  temp = ((x >> 1) & fiveMask);
-  x = x + ((~temp)+1) ;
-  x = (x & threeMask) + ((x >> 2) & threeMask);
-  result = (x + (x >> 4) & altNibMask);
-  //result * 0x1010101 = 16,843,009
-  // result = result * 2^24 + result * 2^16 + result * 2^8 + result
-  // 2*5 = (2 << 2) + 2 = 2*4 + 2
-  result = (result << 24) + (result << 16) + (result << 8) + result;
-  result = (result >> 24)+1;
+  return n + 1;
 
-  //x & (x-1) will be 0 if x is just 2^n
-  subOne = (sign & (!!!(saveX & (saveX + ~0))));
-  //be neg 1 if subOne = 1
-  subOne = (~subOne) + 1;
-  //subOne if x is most neg value
-  return result + subOne; //+ subOne;//+ (sign & (~1 + !!(x ^ min)+1));
-  
 }
 /* 
  * float_abs - Return bit-level equivalent of absolute value of f for
