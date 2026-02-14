@@ -271,7 +271,7 @@ int leastBitPos(int x) {
  *   Rating: 3
  */
 int replaceByte(int x, int n, int c) {
-  int byteShift = (n << 3);
+  int byteShift = (n << 3); //shift 8 bits
   int shiftVal = (c << byteShift); //shift val to right byte position
 
   //fill replaced byte in x with 0
@@ -474,7 +474,7 @@ int howManyBits(int x) {
 
   //x & (x-1) will be 0 if x is just 2^n
   subOne = (sign & (!!!(saveX & (saveX + ~0))));
-  //be neg 1 if subOne = -1
+  //be neg 1 if subOne = 1
   subOne = (~subOne) + 1;
   //subOne if x is most neg value
   return result + subOne; //+ subOne;//+ (sign & (~1 + !!(x ^ min)+1));
@@ -493,11 +493,16 @@ int howManyBits(int x) {
  */
 unsigned float_abs(unsigned uf) {
   //if NAN exponent is 255 and mantissa is not 0
-
-
-  //0 if exponent is 0 and mantissa is 0 
-
-  return uf;
+  unsigned mantissa = (uf << 9);
+  unsigned expo = (uf << 1);
+  unsigned newUF = expo >> 1;
+  mantissa = mantissa >> 9;
+  expo = expo >> 24;
+  //NaN if expo == 255 & mantissa == not 0
+  if (!(expo ^ 255) && mantissa) {
+    return uf;  
+  }
+  return newUF;
 }
 /* 
  * float_twice - Return bit-level equivalent of expression 2*f for
@@ -511,7 +516,54 @@ unsigned float_abs(unsigned uf) {
  *   Rating: 4
  */
 unsigned float_twice(unsigned uf) {
-  return 2;
+  //argument is an unsigned int but as bits (singlept float)
+ 
+  //single point float: sign bit (8 exponent bits) [23 mantissa]
+  //expo = 0 & mantissa = not 0 -> subnormal num
+  //expo = 0 & mantissa =  0 -> 0 (ZERO)
+  //expo = 255 & mantissa = not 0 -> NaN
+  //expo = 255 & mantissa = 0 -> ∞
+  unsigned maskM = 0;
+  unsigned maskEx = 0;
+  unsigned mantissa = 0;
+  unsigned exponent = 0;
+  unsigned sign = 0;
+  unsigned nan = 0;
+
+  maskM = 0x7F; //0111 1111
+  maskM = (maskM << 8) | 0xFF; //0111 1111 1111 1111 [mantissa mask]
+  maskM = maskM << 7 | 0xFF; //23 bits 1s
+  maskEx = 0xFF;
+  maskEx = maskEx << 23; // [exponent mask]
+  mantissa = uf & maskM;
+  exponent = uf & maskEx;
+  sign = ((1 << 31) & uf);
+  exponent = exponent >> 23; 
+  nan = (mantissa ^ 0) && !(exponent ^ 255);
+  //nan or uf == +0 or -0
+  if ((nan || !(uf << 1)) || ((!(exponent ^ 255)) && (!mantissa))){
+    return uf; //return argument if uf == nan
+  }
+  //>> on unsigned pads left with 0s
+  //only on signed ints, >> pads left with the (sign bit)
+
+  //if input uses 1 -> 0s (0x00)(Expo) [0x1] [Mantissa] -> 0*2^-126
+  //vs 1.0 -> 0s (127)(Expo) [0] [Mantissa] -> 1*2^0
+  //0expo and non0 mantissa
+  //uf*2 is just shifting the mantissa << 1
+  if (exponent) {
+    exponent += 1;
+    //shift back expo
+    exponent = exponent << 23;
+    //combine back replace exponent
+    uf = uf & (~maskEx); //just 0s at exponent
+    uf = uf | exponent; //copy expo back into uf
+  } 
+  else {
+    uf = (uf << 1) | sign;
+  }
+
+  return uf;
 }
 /*
  * trueFiveEighths - multiplies by 5/8 rounding toward 0,
@@ -536,12 +588,15 @@ int trueFiveEighths(int x)
 
 
     //0 if x is pos or min
+    //treat -2^31 as if it were positive
     sign = (sign & xMin);
     //exand 1s to whole if neg
     sign = (sign << 31);
     sign = (sign >> 31);
     //Decide to use Two's comp. or stay if pos
     xTC = (x + sign) ^ sign;
+
+
     // x/8 and save remainder
     div8 = xTC >> 3;    
     rem8 = xTC & 7;    
