@@ -174,20 +174,18 @@ NOTES:
 int allEvenBits(int x) {
   //0x55 55 55 55
   //when all nibles 0x5 -> all even positions are 1
-  int temp = 0x55;
+  int mask = 0x55;
   int evenPosCopy = 0;
   int result = 0;
   //extend 0x55 to all bytes
-  temp = (temp | (temp << 8));
-  temp = (temp | (temp << 8));
-  temp = (temp | (temp << 8));
+  mask =  ((mask << 8) | mask );
+  mask = ((mask << 8) | mask );
+  mask =  ((mask << 8) | mask );
 
   //& temp with input
-  //even 1bits that match the mask goto the copy
-  //don't care about odd bits
-  evenPosCopy = temp & x;
+  evenPosCopy = mask & x;
   //if copy doesn't completely match, some 1s are left over
-  result =  temp ^ evenPosCopy;
+  result =  mask ^ evenPosCopy;
   //flip to 1 if they completely match / 0 if not
   result = !result;
   return result;
@@ -238,6 +236,8 @@ int bitParity(int x) {
  *   Legal ops: ~ &
  *   Max ops: 14
  *   Rating: 1
+ * 
+ * Doing (x NOR y) AND (X OR Y) == x XOR y
  */
 int bitXor(int x, int y) {
   int temp = ~(x & y); // becomes notX or notY
@@ -253,6 +253,9 @@ int bitXor(int x, int y) {
  *   Legal ops: ! ~ & ^ | + << >>
  *   Max ops: 6
  *   Rating: 2 
+ * 
+ * This uses a trick that only leaves the lsb that's a 1 left
+ * when you do x AND (two's comp of x).
  */
 int leastBitPos(int x) {
 
@@ -269,16 +272,23 @@ int leastBitPos(int x) {
  *   Legal ops: ! ~ & ^ | + << >>
  *   Max ops: 10
  *   Rating: 3
+ * 
+ * 
+ * I shift the byte I want to insert by n bytes so it lines
+ * up where it's going to be in x.
+ * A mask is used to erase the bits at the byte being replaced.
+ * Then, c is copied onto x using |.
+ * 
  */
 int replaceByte(int x, int n, int c) {
-  int byteShift = (n << 3); //shift 8 bits
-  int shiftVal = (c << byteShift); //shift val to right byte position
+  int byteShift = (n << 3); //shift n * 2^3  (8 bits)
+  int shiftVal = (c << byteShift); //shift c to the right byte position
 
   //fill replaced byte in x with 0
   int mask = ~(0xFF << byteShift);
   //replace pos in x with 0s
   x = (x & mask);
-  //put c in x
+  //copy c to x
   x = x | shiftVal;
   return x;
 
@@ -288,14 +298,11 @@ int replaceByte(int x, int n, int c) {
  *   Legal ops: ! ~ & ^ | + << >>
  *   Max ops: 4
  *   Rating: 1
+ * 
+ * not sign bit is the INT_MAX
  */
 int tmax(void) {
-  //Two's complement Ints lose a bit for the sign
-  int max = 0xFF; 
-  max = (max << 8) | max; //first 16bits 1
-  max = (max << 15) | max; //first 31 bits are 1
-
-  return max;
+  return ~(1 << 31);
 }
 /* 
  * fitsBits - return 1 if x can be represented as an 
@@ -305,15 +312,22 @@ int tmax(void) {
  *   Legal ops: ! ~ & ^ | + << >>
  *   Max ops: 15
  *   Rating: 2
+ * 
+ * Note: Bug in test that does not like anything with 32bits
+ * 
+ * If x is a positive number, shifting x n
+ * bits to the right and if it results in all 0s it means x fits.
+ * If x is negative, it's bits are flipped but this happens either way.
+ * 1 isn't subracteed from fitNeg and the shift is changed by -1 so
+ * that the absolute min and 0/1 can be correct.
+ * 
+ * So x fits in n bits if either it fitsPos or fitsNeg.
  */
 int fitsBits(int x, int n) {
-  //signed int
-  //max value = 2^(n-1) -1
-  //min value = -2^(n-1)
   //shifting pos num to right n-1 makes all 0 bits if fit.
   int shift = (n + ~0);
   int fitsPos = !(x >> (shift));
-  //flip without subracting to keep max num out of bounds
+  //flip without subracting to keep -max num out of bounds
   int fitNeg = (!((~(x)) >> shift));
 
   //(test does not like anything where n = 32) or where
@@ -329,6 +343,11 @@ int fitsBits(int x, int n) {
  *   Legal ops: ! ~ & ^ | + << >>
  *   Max ops: 15
  *   Rating: 2
+ * 
+ * If x is positive, it can just be x >> n.
+ * If x is negative, it must be flipped first.
+ * If x is the absolute min -2^31, treat it like a positive num
+ *  so I set sign back to 0.
  */
 int divpwr2(int x, int n) {
     int sign = (x >> 31);
@@ -336,14 +355,12 @@ int divpwr2(int x, int n) {
     //does nothing if x is Pos,
     //flips to positive if x is Neg 
     int xTC = (x + sign) ^sign;
-
     //special case for x is the MIN
-    //when x is pos, neg but not Min -> Do Nothing
-    //force sign to zero if neg and the Min
-    sign = !!(x^(1<<31)) & sign;
     //spread 1s throughout sign if x is neg but not Min
+    sign = !!(x^(1<<31)) & sign;
     sign = (sign << 31);
     sign = (sign >> 31);
+
     //divide x by 2^n
     result = (xTC >> n);
     //flip back to origional sign if we need to
@@ -356,13 +373,13 @@ int divpwr2(int x, int n) {
  *   Legal ops: ! ~ & ^ | + << >>
  *   Max ops: 5
  *   Rating: 2
+ * 
+ *  x XOR x == 0 iff x == x
+ * so if x == y -> x XOR y == 0
  */
 int isEqual(int x, int y) {
-  //are x and y diff
-  //if same ^ = 0
   int eq = x ^ y;
-  //force eq to 1 if x^y = 0 (match),
-  // else some num force to 0
+  //flip so return is 1 if equal, 0 if not
   eq = !eq;
   return eq;
 }
@@ -372,15 +389,18 @@ int isEqual(int x, int y) {
  *   Legal ops: ! ~ & ^ | + << >>
  *   Max ops: 8
  *   Rating: 3
+ * 
+ * 1 if x > 0
+ * 0 if x <= 0
+ *
+ * So x is positive if NOT(neg || 0)
+ * not neg && not zero
+ * 
  */
 int isPositive(int x) {
-  // return 0 if  x <= 0, 1 if x > 0
-  // return 0 if x is either negative or 0
-  // return 1 if x is positive
-
-  //sign bit will be 1 if negative number
-  int signBit = (x >> 31) & 1;
-  //!x will be 1 if x is 0
+  //sign == 1 if neg x
+  int signBit = (x >> 31);
+  //!x == 1 if x == 0
   int isZero = !x;
 
   //return 1 if not (neg or zero) -> not(neg) and not(zero)
@@ -394,22 +414,26 @@ int isPositive(int x) {
  *   Legal ops: ! ~ & ^ | + << >>
  *   Max ops: 20
  *   Rating: 3
+ * 
+ * x-y is ok if x and y are the same signs.
+ * Overflows if the result has a different sign than x.
+ * Sub is ok if x and y are the same sign OR signX and result sign
+ * match.
  */
 int subOK(int x, int y) {
-  //if x and y are diff signs --> possibility of overflow
-  //x and y are same signs, x-y has no chance of overflow
-  //get -y 
   int newY = (~y) + 1;
   int signX = (x >> 31) & 1;
   int signY = (y >> 31) & 1;
   int diffXY = (x + newY);
   int newSign = (diffXY >> 31) & 1;
 
-  //if same sign x-y will not overflow 
+  //if x and y have same sign x-y will not overf./underf.
+  //if x and y have DIFF signs AND signx is DIFF than the resulting sign,
+  //it underflowed :(
   int signXY = (signX ^ signY);
-  int OverFlows = signXY & (signX ^ newSign);
+  int Flows = signXY & (signX ^ newSign);
 
-  return !OverFlows;
+  return !Flows;
 }
 /* howManyBits - return the minimum number of bits required to represent x in
  *             two's complement
@@ -423,8 +447,15 @@ int subOK(int x, int y) {
  *  Max ops: 90
  *  Rating: 4
  * 
- *  refrences: https://www.solutioninn.com/study-help/questions/please-explain-this-bitwise-operation-line-by-line-thank-you-13825030
- *
+ * 
+ * refrences: https://www.solutioninn.com/study-help/questions/please-explain-this-bitwise-operation-line-by-line-thank-you-13825030
+ * I used this code from this solution I found since it is such a simple and
+ * straightforward way to get the first 1 bit on the left.
+ * I originally tried reversing x doing something similar
+ * to the bitparity func above just swapping larger and larger amounts of bits
+ * and then I would find the first bit on the right; But, this is much simpler
+ * solution.
+ * 
  * The general process is like this;
  * x is shifted 16 to the right, if there are still 1s,
  * that means we need at least 16 bits for the num, so we add
@@ -432,11 +463,11 @@ int subOK(int x, int y) {
  * shifting is used instead of just adding here since if there
  * were no 1s, we don't want to add anything for the bit requirement
  * 
- * Then x is shifted (16) + 8 bits to the right. If there are STILL
+ * Then, x is shifted (16) + 8 bits to the right. If there are STILL
  * ones remaining, we need at least 24 bits for our number.
  * and so on....
  * 
- * For example if we had (25) = 0001 1001
+ * For example if we had x == (25) = 0001 1001
  * 25 >> 16 -> only 0s so n <= 16
  * 25 >> (0)+8 -> only 0s -> n <= 8
  * 25 >> (0)+4 -> 1 -> 4 < n <= 8
@@ -444,20 +475,18 @@ int subOK(int x, int y) {
  * 25 >> (4)+1 -> 0s -> 4 < n <= 5
  * 25 >> (4) -> 1 -> n = 5
  * add one at the end to accommodate it being signed
- * n = 6
- * 
+ * n = n + 1 = 6
  * 
  */
 int howManyBits(int x) {
   int sign = (x >> 31);
   int n = 0; //# of required bits
-  //flip if neg/do nothing if positive
-  //don't sub 1 to keep max in range
+  //flip to neg/do nothing if positive
   x = x ^ sign;
 
   //if x >> n+number of bits and is 0,
   //it implies we need at least n+number bits for the number x
-  n = n + ((!!(x >> (n+16))) << 4);
+  n = n + ((!!(x >> (16))) << 4);
   n = n + ((!!(x >> (n+8))) << 3);
   n = n + ((!!(x >> (n+4))) << 2);
   n = n + ((!!(x >> (n+2))) << 1);
@@ -465,7 +494,6 @@ int howManyBits(int x) {
   n = n + ((!!(x >> (n))));
 
   return n + 1;
-
 }
 /* 
  * float_abs - Return bit-level equivalent of absolute value of f for
@@ -477,6 +505,15 @@ int howManyBits(int x) {
  *   Legal ops: Any integer/unsigned operations incl. ||, &&. also if, while
  *   Max ops: 10
  *   Rating: 2
+ * 
+ * 
+ * I abused some shifts to isolate the mantissa and exponent/knock off the 
+ * sign bit. I'm allowed to use >> worry free here since everything is
+ * unsigned, the left is filled with 0s when >>.
+ * 
+ * Then, NaN is when expo (255), Mantissa [not 0]
+ *    returns og uf if Not a Number.
+ * Otherwise, it returns uf without the sign bit.
  */
 unsigned float_abs(unsigned uf) {
   //if NAN exponent is 255 and mantissa is not 0
@@ -501,52 +538,56 @@ unsigned float_abs(unsigned uf) {
  *   Legal ops: Any integer/unsigned operations incl. ||, &&. also if, while
  *   Max ops: 30
  *   Rating: 4
+ *  
+ *   single point float: sign bit (8 exponent bits) [23 mantissa]
+ *   expo = 0 & mantissa = not 0 -> subnormal num
+ *   expo = 0 & mantissa =  0 -> 0 (ZERO)
+ *   expo = 255 & mantissa = not 0 -> NaN
+ *   expo = 255 & mantissa = 0 -> ∞
+ * 
+ *  Masks:
+ *    MaskM - for the mantissa
+ *    MaskEx - for exponent
+ *  Exponent and mantissa are isolated.
+ *  returns uf if uf ==NaN, +-0, +-Inf
+ *  Otherwise, if the exponent isn't 0 -> uf*2 == exponent + 1;
+ *    else, uf*2 == uf << 1 and we keep the sign bit.
  */
 unsigned float_twice(unsigned uf) {
-  //argument is an unsigned int but as bits (singlept float)
- 
-  //single point float: sign bit (8 exponent bits) [23 mantissa]
-  //expo = 0 & mantissa = not 0 -> subnormal num
-  //expo = 0 & mantissa =  0 -> 0 (ZERO)
-  //expo = 255 & mantissa = not 0 -> NaN
-  //expo = 255 & mantissa = 0 -> ∞
   unsigned maskM = 0;
   unsigned maskEx = 0;
   unsigned mantissa = 0;
   unsigned exponent = 0;
   unsigned sign = 0;
   unsigned nan = 0;
-
-  maskM = 0x7F; //0111 1111
-  maskM = (maskM << 8) | 0xFF; //0111 1111 1111 1111 [mantissa mask]
-  maskM = maskM << 7 | 0xFF; //23 bits 1s
+  //setup mask for Mantissa and Exponent
+  maskM = 0x7F;
+  maskM = (maskM << 8) | 0xFF;
+  maskM = maskM << 7 | 0xFF; //23bits
   maskEx = 0xFF;
-  maskEx = maskEx << 23; // [exponent mask]
+  maskEx = maskEx << 23;
+  //Isolate Mantissa and Expo with their masks + sign
   mantissa = uf & maskM;
   exponent = uf & maskEx;
   sign = ((1 << 31) & uf);
+  //push exponent all the way to the right
   exponent = exponent >> 23; 
-  nan = (mantissa ^ 0) && !(exponent ^ 255);
-  //nan or uf == +0 or -0
-  if ((nan || !(uf << 1)) || ((!(exponent ^ 255)) && (!mantissa))){
-    return uf; //return argument if uf == nan
-  }
-  //>> on unsigned pads left with 0s
-  //only on signed ints, >> pads left with the (sign bit)
 
-  //if input uses 1 -> 0s (0x00)(Expo) [0x1] [Mantissa] -> 0*2^-126
-  //vs 1.0 -> 0s (127)(Expo) [0] [Mantissa] -> 1*2^0
-  //0expo and non0 mantissa
-  //uf*2 is just shifting the mantissa << 1
+  //result = uf if x == (nan, +-0, +-Infinity)
+  nan = (mantissa ^ 0) && !(exponent ^ 255);
+  if ((nan || !(uf << 1)) || ((!(exponent ^ 255)) && (!mantissa))){
+    return uf; 
+  }
+
+  //exponent not zero -> uf*2 == exponent +1
   if (exponent) {
     exponent += 1;
-    //shift back expo
+    //combine back and replace exponent
     exponent = exponent << 23;
-    //combine back replace exponent
-    uf = uf & (~maskEx); //just 0s at exponent
-    uf = uf | exponent; //copy expo back into uf
-  } 
-  else {
+    uf = uf & (~maskEx);
+    uf = uf | exponent; 
+  } else {
+    //uf*2 and keep the sign
     uf = (uf << 1) | sign;
   }
 
@@ -561,38 +602,48 @@ unsigned float_twice(unsigned uf) {
  *  Legal ops: ! ~ & ^ | + << >>
  *  Max ops: 25
  *  Rating: 4
+ * Refrences: https://stackoverflow.com/questions/42288066/bitwise-multiply-by-5-8-watching-for-overflow/42288197#comment71733304_42288197
+ * This helped me come up with a solution to losing acuuracy when the raminder
+ * gets lost. You can just separate the ramainder of 8, do rem*5/8
+ * and then combine it back to the result. This way dividing by 8 doesn't
+ * end up being incorrect in the end.
+ * 
+ * dividing by 8 loses accuracy from the remainder.
+ * Extract the remainder first by x & 7.
+ * Then just multiply like normal with << and do the same to
+ * the remainder and combine it back.
+ * I added checking for the abosulute min in the solution since
+ * the btest did not like it if x was INT_MIN.
  */
 int trueFiveEighths(int x)
 {
     int xMin = !!((1 << 31)^(x));
     int sign = (x >> 31);
     int xTC = 0;
-    int div8 = 0;
-    int rem8 = 0;
-    int main_part = 0;
-    int fractional = 0;
-    int result = 0;
+    int xDiv8 = 0;
+    int xRem8 = 0;
+    int intResult = 0;
+    int remResult = 0;
+    int finalResult = 0;
 
-
-    //0 if x is pos or min
-    //treat -2^31 as if it were positive
+    //Setup X and Sign----------------------
+    //When xMin, x is treated as if positive
     sign = (sign & xMin);
     //exand 1s to whole if neg
     sign = (sign << 31);
     sign = (sign >> 31);
     //Decide to use Two's comp. or stay if pos
     xTC = (x + sign) ^ sign;
-
-
-    // x/8 and save remainder
-    div8 = xTC >> 3;    
-    rem8 = xTC & 7;    
-    // (x/8) * 5
-    main_part = (div8 << 2) + div8;
+    //Compute X * (5/8)---------------------
+    //divide x by 8, (xdiv8)*5 and extract remainder. 
+    xDiv8 = xTC >> 3;    
+    intResult = (xDiv8 << 2) + xDiv8;
+    xRem8 = xTC & 7;        
     //5/8 on remainder
-    fractional = ((rem8 << 2) + rem8) >> 3;
+    remResult = ((xRem8 << 2) + xRem8) >> 3;
+    //Combine to final result -------------
+    finalResult = intResult + remResult;
     //flip result to neg if we started neg
-    result = main_part + fractional;
-    return (result & ~sign) | ((~(result)+1) & (sign));
+    return (finalResult & ~sign) | ((~(finalResult)+1) & (sign));
  
 }
