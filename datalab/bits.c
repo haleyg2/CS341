@@ -333,7 +333,9 @@ int fitsBits(int x, int n) {
   //(test does not like anything where n = 32) or where
   //X = 2^n-1 -1 or -2^n-1
   //either fits or is not n=32
-  return (fitsPos | fitNeg) & !!(n^32);
+  //note: old fitsBits test was:
+  //  (fitsPos | fitNeg) & !!(n^32)
+  return (fitsPos | fitNeg);
  
 }
 /* 

@@ -109,8 +109,8 @@ int test_tmax(void) {
 int test_fitsBits(int x, int n)
 {
   int TMin_n = -(1 << (n-1));
-  int TMax_n = (1 << (n-1)) - 1;
-  return x >= TMin_n && x <= TMax_n;
+  int TMax_n = (int)((1u << (n-1)) - 1u);
+  return ((x >= TMin_n) && (x <= TMax_n));
 }
 int test_divpwr2(int x, int n)
 {
