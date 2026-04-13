@@ -19,10 +19,19 @@ typedef struct {
 //-1 -> EVICT     not loaded/CAN'T load
 int rowTransverser(Way row[],int E,unsigned tag) {
     short validWays = 0;
+    //first increment all valid line
+    for (int i = 0; i < E; ++i) {
+        if (row[i].valid == 1) {
+            row[i].lruCounter++;
+        }
+    }
+
+
+
     for (int i = 0; i < E; ++i) {
         if (row[i].valid == 1 && row[i].tag == tag) {
             //address is already loaded/valid :) HIT!
-            row[i].lruCounter += 1;
+            row[i].lruCounter = 0;
             return 1;
         } else if (row[i].valid == 1) {
             ++validWays;
@@ -35,12 +44,12 @@ int rowTransverser(Way row[],int E,unsigned tag) {
         int lruIndex = 0;
         //get index of LRU Way
         for (int i = 1;i < E; ++i) {
-            if (row[i].lruCounter < row[lruIndex].lruCounter) {
+            if (row[i].lruCounter > row[lruIndex].lruCounter) {
                 lruIndex = i;
             }
         }
         row[lruIndex].tag = tag;
-        row[lruIndex].lruCounter = 1;
+        row[lruIndex].lruCounter = 0;
         row[lruIndex].valid = 1;
 
         return -1; //EVICTED
@@ -49,19 +58,13 @@ int rowTransverser(Way row[],int E,unsigned tag) {
         for (int i = 0;i < E; ++i) {
             if (row[i].valid == 0) {
                 row[i].tag = tag;
-                row[i].lruCounter = 1;
+                row[i].lruCounter = 0;
                 row[i].valid = 1;
+                break; //leave for
             }
         }
     }
     return 0; //MISS
-}
-
-//FINDS A VICTIM TO EVICT in a row
-//LRU (Least Recently Used) POLICY
-void evictor(Way row[],int E,unsigned tag) {
-
-
 }
 
 
@@ -72,6 +75,7 @@ int main(int argc, char* argv[])
     int s = -1;   //set bits -> rows = 2^s
     int E = -1;   //lines per set -> cols
     int b = 1;   //offset bits -> Blocksize Bytes B = 2^b
+    int verbose = 0;
     char* t = NULL;
     //Process arguments
     //arguments start at index 1
@@ -89,13 +93,17 @@ int main(int argc, char* argv[])
         } else if (strcmp(argv[i], "-t") == 0 && i + 1 < argc) {
             ++i;  //t is next input (trace file)
             t = argv[i];
+        } else if (strcmp(argv[i], "-v") == 0) {
+            verbose = 1;
         }
     }
     int rowSize = (1 << s);
     //print arguments
+    /*
     printf("s: %d -> %d rows\nE: %d -> %d cols\n" ,s,rowSize,E,E);
     printf("b: %d -> block size %d bytes\n%s\n"  ,b,(1 << b),t);
     //DONE VERIFYING INPUT
+    */
 
 
     //Create Matrix of structs for the cache
@@ -105,9 +113,9 @@ int main(int argc, char* argv[])
         for (int j = 0; j < E; ++j) {
             mymatrix[i][j].valid = 0;
             mymatrix[i][j].lruCounter = 0;
-            printf("%d " ,mymatrix[i][j].valid);
+            //printf("%d " ,mymatrix[i][j].valid);
         }
-        printf("\n");
+        //printf("\n");
     }
 
 
@@ -124,7 +132,7 @@ int main(int argc, char* argv[])
     unsigned tag = 0;
     //cache stats
     unsigned hits = 0;
-    unsigned missess = 0;
+    unsigned misses = 0;
     unsigned evictions = 0;
     //designated row
     unsigned sIndex = 0;
@@ -136,36 +144,62 @@ int main(int argc, char* argv[])
         if (sscanf(line, " %c %x", &operator, &tag) == 2) {
             //What set does the Address belong to? (row) (CAN CONFLICT)
             sIndex = (tag >> b) & ((1 << s) - 1);
+
+            //if cmd arg -v
+            if (verbose) {
+                printf("Address: 0x%x    %c\n", tag, operator);
+            }
             //What is the tag for this address? (Unique id)
             tag = tag >> (s + b);
 
             //decide what to DO
+            int rowResult = 0;
             switch (operator) {
                 case 'L':
-                    int rowResult = rowTransverser(mymatrix[sIndex], E, tag);
+                    rowResult = rowTransverser(mymatrix[sIndex], E, tag);
                     //check if address is already loaded/valid in specific row
                     if (rowResult == 1) {
                         ++hits;
                     } else if (rowResult == 0) {
-                        ++missess; //then load
+                        ++misses; //then load
                     } else {
-                        ++evictions;
-                        //EVICTION TIME
+                        ++misses; //not found
+                        ++evictions; //then evict
+                    }
+                    break; //DONE CASE L
+                case 'S':
+                    rowResult = rowTransverser(mymatrix[sIndex], E, tag);
+                    //check if address is already loaded/valid in specific row
+                    if (rowResult == 1) {
+                        ++hits;
+                    } else if (rowResult == 0) {
+                        ++misses; //then load
+                    } else {
+                        ++misses; //not found
+                        ++evictions; //then evict
                     }
 
-
-                    break;
-                case 'S':
-
-                    break;
+                    break; //DONE CASE S
                 case 'M':
+                    rowResult = rowTransverser(mymatrix[sIndex], E, tag);
+                    //check if address is already loaded/valid in specific row
+                    if (rowResult == 1) {
+                        hits += 2;
+                    } else if (rowResult == 0) {
+                        ++misses; //then load
+                        ++hits; //then modify
+                    } else {
+                        ++misses; //not found
+                        ++evictions; //then evict
+                        ++hits; //then modify
+                    }
+                //DONE CASE M
 
             }//end switch
 
 
 
-            // Successfully parsed
-            printf("Address: 0x%x    %c\n", tag,operator);
+        //DONE PARSING
         }
 
     }
@@ -177,7 +211,7 @@ int main(int argc, char* argv[])
     free(mymatrix);
 
 
-    printSummary(0,0,0);
+    printSummary(hits,misses,evictions);
     return 0;
 }
 
